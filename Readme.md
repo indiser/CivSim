@@ -286,7 +286,7 @@ CivSim/
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/your-username/civsim.git
+git clone https://github.com/indiser/CivSim.git
 cd civsim
 python -m venv env
 env\Scripts\activate        # Windows
