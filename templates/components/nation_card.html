@@ -1,21 +1,27 @@
 {# Jinja2 macro: Kingdom skeleton loader — gold-shimmer version matching new card layout #}
 {% macro nation_skeleton() %}
-<article class="nation-card noise-panel animate-pulse" style="border-left-color: #2a3347; cursor: default;">
+<article class="nation-card noise-panel animate-pulse" style="border-left-color: #243044; cursor: default; animation-delay: 0s;">
   <div class="kingdom-card-header">
-    <div style="width:26px;height:26px;border-radius:50%;background:#1e2433;border:1px solid #2a3347;flex-shrink:0;"></div>
+    <!-- Crest placeholder -->
+    <div style="width:30px;height:30px;border-radius:50%;background:rgba(36,48,68,0.6);border:1px solid rgba(36,48,68,0.9);flex-shrink:0;" class="nation-skeleton-bar"></div>
     <div style="flex:1;">
-      <div class="h-5 rounded" style="width:100px;margin-bottom:4px;border-radius:4px;"></div>
-      <div class="h-4 rounded-full" style="width:56px;border-radius:3px;"></div>
+      <!-- Name placeholder -->
+      <div class="nation-skeleton-bar h-5 rounded" style="width:96px;height:12px;margin-bottom:5px;border-radius:4px;"></div>
+      <!-- Ideology badge placeholder -->
+      <div class="nation-skeleton-bar h-4 rounded-full" style="width:52px;height:9px;border-radius:3px;"></div>
     </div>
-    <div style="width:28px;height:22px;border-radius:4px;" class="h-5 rounded"></div>
+    <!-- Power badge placeholder -->
+    <div class="nation-skeleton-bar h-5 rounded" style="width:30px;height:28px;border-radius:5px;"></div>
   </div>
-  <div class="card-stat-bars" style="gap:4px;margin-bottom:7px;">
-    <div style="height:5px;border-radius:2px;width:100%;" class="h-4 rounded"></div>
-    <div style="height:5px;border-radius:2px;width:88%;"  class="h-4 rounded"></div>
-    <div style="height:5px;border-radius:2px;width:94%;"  class="h-4 rounded"></div>
-    <div style="height:5px;border-radius:2px;width:72%;"  class="h-4 rounded"></div>
-    <div style="height:5px;border-radius:2px;width:80%;"  class="h-4 rounded"></div>
+
+  <div class="card-stat-bars" style="gap:5px;margin-bottom:9px;">
+    <div class="nation-skeleton-bar" style="height:4px;border-radius:2px;width:100%;"></div>
+    <div class="nation-skeleton-bar" style="height:4px;border-radius:2px;width:86%;"></div>
+    <div class="nation-skeleton-bar" style="height:4px;border-radius:2px;width:93%;"></div>
+    <div class="nation-skeleton-bar" style="height:4px;border-radius:2px;width:70%;"></div>
+    <div class="nation-skeleton-bar" style="height:4px;border-radius:2px;width:78%;"></div>
   </div>
-  <div class="h-3 rounded" style="width:60%;border-radius:3px;"></div>
+
+  <div class="nation-skeleton-bar h-3 rounded" style="width:55%;height:8px;border-radius:3px;"></div>
 </article>
 {% endmacro %}

@@ -1,4 +1,5 @@
 // Pure DOM rendering. Never fetches. Receives data, mutates the page.
+// All exported function signatures are preserved exactly.
 
 export const NATION_COLORS = {
   Ironmark: "#c0392b",
@@ -17,24 +18,45 @@ const NATION_CRESTS = {
   Kethara:  "✿",
 };
 
+// Ideology-to-short-label mapping
+const IDEOLOGY_LABELS = {
+  militarist:   "Militarist",
+  mercantilist: "Mercantile",
+  expansionist: "Expansionist",
+  isolationist: "Isolationist",
+  diplomat:     "Diplomat",
+};
+
 const ACTION_STYLES = {
-  attack:       { bg: "#c0392b", fg: "#fff" },
-  declare_war:  { bg: "#c0392b", fg: "#fff" },
-  trade:        { bg: "#2980b9", fg: "#fff" },
-  alliance:     { bg: "#27ae60", fg: "#fff" },
-  betray:       { bg: "#8e44ad", fg: "#fff" },
-  spy:          { bg: "#2c3e50", fg: "#a29bfe" },
-  develop:      { bg: "#16a085", fg: "#fff" },
-  nothing:      { bg: "#1e2433", fg: "#7a8099" },
+  attack:       { bg: "#7B241C", fg: "#FF8A80" },
+  declare_war:  { bg: "#7B241C", fg: "#FF8A80" },
+  trade:        { bg: "#1A5276", fg: "#82C4F8" },
+  alliance:     { bg: "#1E5631", fg: "#6FCF97" },
+  betray:       { bg: "#4A235A", fg: "#CE93D8" },
+  spy:          { bg: "#212F3C", fg: "#A29BFE" },
+  develop:      { bg: "#0E6655", fg: "#80D8C3" },
+  nothing:      { bg: "#161B22", fg: "#7A8099" },
+};
+
+// Action → chronicle icon
+const ACTION_ICONS = {
+  attack:      "⚔",
+  declare_war: "⚔",
+  trade:       "💰",
+  alliance:    "🤝",
+  betray:      "🗡",
+  spy:         "🕵",
+  develop:     "🏛",
+  nothing:     "…",
 };
 
 // Stat display config
 const STAT_DEFS = [
-  { key: "army",       sym: "⚔", label: "Army",       color: "#c0392b", max: 1000,  tip: "Military strength — determines combat outcomes." },
-  { key: "gold",       sym: "♛", label: "Gold",       color: "#D4AF37", max: 1000,  tip: "Economic resource — funds development and war." },
-  { key: "population", sym: "♟", label: "Population", color: "#27ae60", max: 100000,tip: "Civilian count — the lifeblood of the nation." },
-  { key: "happiness",  sym: "☯", label: "Happiness",  color: "#f39c12", max: 1,     tip: "Civil contentment 0–100%. Low happiness breeds unrest." },
-  { key: "territory",  sym: "⬡", label: "Territory",  color: "#16a085", max: 100,   tip: "Land controlled — seized and lost through war." },
+  { key: "army",       sym: "⚔", label: "Army",     color: "#C0392B", max: 1000,   tip: "Military strength — determines combat outcomes." },
+  { key: "gold",       sym: "♛", label: "Gold",     color: "#D4AF37", max: 1000,   tip: "Economic resource — funds development and war." },
+  { key: "population", sym: "♟", label: "Pop",      color: "#27AE60", max: 100000, tip: "Civilian count — the lifeblood of the nation." },
+  { key: "happiness",  sym: "☯", label: "Mood",     color: "#F39C12", max: 1,      tip: "Civil contentment 0–100%. Low happiness breeds unrest." },
+  { key: "territory",  sym: "⬡", label: "Territory",color: "#16A085", max: 100,    tip: "Land controlled — seized and lost through war." },
 ];
 
 // Rarity mapping by action type
@@ -62,11 +84,13 @@ function esc(str) {
 }
 
 function statDisplay(stat, value) {
-  return stat === "happiness" ? `${Math.round(value * 100)}%` : String(Math.round(value));
+  if (stat === "happiness")  return `${Math.round(value * 100)}%`;
+  if (stat === "population") return Math.round(value).toLocaleString();
+  return String(Math.round(value));
 }
 
 function relationClass(value) {
-  if (value > 30) return "rel-good";
+  if (value > 30)  return "rel-good";
   if (value < -30) return "rel-bad";
   return "rel-neutral";
 }
@@ -81,42 +105,48 @@ function computePower(n) {
   );
 }
 
-function getThreatLabel(army) {
-  if (army > 700) return { label: "APEX",   color: "#e74c3c" };
-  if (army > 400) return { label: "HIGH",   color: "#e67e22" };
-  if (army > 200) return { label: "MED",    color: "#f39c12" };
-  return                 { label: "LOW",    color: "#7a8099" };
+function getThreatLevel(army) {
+  if (army > 700) return { label: "APEX",  color: "#E74C3C", glow: "rgba(231,76,60,0.5)" };
+  if (army > 400) return { label: "HIGH",  color: "#E67E22", glow: "rgba(230,126,34,0.4)" };
+  if (army > 200) return { label: "MED",   color: "#F39C12", glow: "rgba(243,156,18,0.35)" };
+  return               { label: "LOW",   color: "#5D6D7E", glow: "rgba(93,109,126,0.2)" };
 }
 
 // ─────────────────────────────────────────────────────────────────
 // RENDER NATIONS — Kingdom profile cards in the left panel
 // ─────────────────────────────────────────────────────────────────
 export function renderNations(nations) {
-  const grid = document.getElementById("nation-grid");
+  const grid  = document.getElementById("nation-grid");
   const names = Object.keys(nations);
 
-  grid.innerHTML = names.map((name) => {
-    const n = nations[name];
-    const color = NATION_COLORS[name] || "#7a8099";
-    const crest = NATION_CRESTS[name] || "✦";
-    const power = computePower(n);
-    const threat = getThreatLabel(n.army);
+  grid.innerHTML = names.map((name, idx) => {
+    const n      = nations[name];
+    const color  = NATION_COLORS[name]  || "#7a8099";
+    const crest  = NATION_CRESTS[name]  || "✦";
+    const power  = computePower(n);
+    const threat = getThreatLevel(n.army);
 
     // Stat bars
     const statBarsHTML = STAT_DEFS.map((s) => {
-      const prev = prevStats[name]?.[s.key];
-      const startValue = prev !== undefined ? prev : n[s.key];
-      const startPct = Math.min(100, (startValue / s.max) * 100);
+      const prev      = prevStats[name]?.[s.key];
+      const startVal  = prev !== undefined ? prev : n[s.key];
+      const startPct  = Math.min(100, (startVal / s.max) * 100);
+      const trend     = prev !== undefined
+        ? (n[s.key] > prev ? "▲" : n[s.key] < prev ? "▼" : "")
+        : "";
+      const trendColor = trend === "▲" ? "#27AE60" : trend === "▼" ? "#C0392B" : "transparent";
+
       return `
         <div class="card-stat-row" data-tip="${esc(s.tip)}">
           <span class="card-stat-sym" style="color:${s.color};">${s.sym}</span>
           <div class="card-stat-bar">
             <div class="card-stat-fill" id="bar-${esc(name)}-${s.key}"
-                 style="width:${startPct.toFixed(1)}%;background:${s.color};"></div>
+                 style="width:${startPct.toFixed(1)}%;background:linear-gradient(90deg,${s.color}cc,${s.color});"></div>
           </div>
           <span class="card-stat-val count-up" id="stat-${esc(name)}-${s.key}">
-            ${statDisplay(s.key, startValue)}
+            ${statDisplay(s.key, startVal)}
           </span>
+          <span style="font-size:7px;color:${trendColor};width:8px;flex-shrink:0;line-height:1;">${trend}</span>
         </div>`;
     }).join("");
 
@@ -126,39 +156,51 @@ export function renderNations(nations) {
     ).join("");
 
     // Latest memory
-    const mem = (n.memory || []).slice(-1)[0] || "";
+    const mem    = (n.memory || []).slice(-1)[0] || "";
     const memPeek = mem
-      ? `<span class="memory-peek" title="${esc(mem)}">"${esc(mem.slice(0, 40))}${mem.length > 40 ? '…' : ''}"</span>`
+      ? `<span class="memory-peek" title="${esc(mem)}">"${esc(mem.slice(0, 36))}${mem.length > 36 ? "…" : ""}"</span>`
       : "";
 
     // Eliminated overlay
     const overlay = n.eliminated
-      ? `<div class="eliminated-overlay">☠ ELIMINATED</div>`
+      ? `<div class="eliminated-overlay">
+           <span style="font-size:20px;opacity:0.6;">☠</span>
+           <span>ELIMINATED</span>
+         </div>`
       : "";
 
     return `
       <article class="nation-card noise-panel" id="card-${esc(name)}"
-               style="border-left-color:${color};"
+               style="border-left-color:${color};animation-delay:${idx * 55}ms;"
                data-nation="${esc(name)}">
         ${overlay}
         <div class="kingdom-card-header">
-          <div class="kingdom-crest-sm" style="color:${color};border-color:${color}40;">${crest}</div>
+          <div class="kingdom-crest-sm" style="color:${color};border-color:${color}45;background:${color}14;">
+            ${crest}
+          </div>
           <div class="kingdom-card-meta">
-            <div class="kingdom-card-name">${esc(name)}</div>
-            <span class="ideology-badge">${esc(n.ideology)}</span>
+            <div class="kingdom-card-name" style="color:${color};">${esc(name)}</div>
+            <span class="ideology-badge">${esc(n.ideology || "—")}</span>
           </div>
           <div class="power-score-badge" data-tip="Combined power score">
-            <span style="color:var(--gold-dim);font-size:7px;">PWR</span><br>
-            <span style="color:var(--text-gold);font-size:11px;">${power}</span>
+            <span style="color:var(--text-faint);font-size:6.5px;letter-spacing:.1em;">PWR</span><br>
+            <span style="color:${color};font-size:13px;font-weight:900;">${power}</span>
           </div>
         </div>
+
         <div class="card-stat-bars">${statBarsHTML}</div>
+
         <div class="card-footer">
           <div class="relations-row">${dots}</div>
           ${memPeek}
-          <span style="font-family:'Cinzel',serif;font-size:8px;color:${threat.color};
-                       border:1px solid ${threat.color}40;border-radius:3px;padding:1px 5px;
-                       white-space:nowrap;">${threat.label}</span>
+          <span style="
+            font-family:'Cinzel',serif;font-size:7.5px;font-weight:800;
+            color:${threat.color};
+            border:1px solid ${threat.color}50;border-radius:4px;
+            padding:2px 6px;white-space:nowrap;
+            box-shadow:0 0 6px ${threat.glow};
+            text-shadow:0 0 8px ${threat.color};
+          ">${threat.label}</span>
         </div>
       </article>`;
   }).join("");
@@ -174,7 +216,6 @@ export function renderNations(nations) {
         animateStatChange(name, s.key, n[s.key]);
         animateStatBar(name, s.key, n[s.key], s.max);
       } else {
-        // First-load bar animation: start at 0, animate to real value
         requestAnimationFrame(() => {
           setTimeout(() => animateStatBar(name, s.key, n[s.key], s.max), 80);
         });
@@ -191,9 +232,9 @@ export function renderNations(nations) {
 
   // Eliminated count pill
   const eliminated = names.filter((name) => nations[name].eliminated).length;
-  const alive = names.length - eliminated;
-  const elimPill = document.getElementById("elim-pill");
-  const aliveEl = document.getElementById("nations-alive-count");
+  const alive      = names.length - eliminated;
+  const elimPill   = document.getElementById("elim-pill");
+  const aliveEl    = document.getElementById("nations-alive-count");
   if (aliveEl) aliveEl.textContent = alive;
 
   if (eliminated > 0) {
@@ -203,7 +244,6 @@ export function renderNations(nations) {
     elimPill.classList.add("hidden");
   }
 
-  // World age based on turn (read from turn counter text)
   updateWorldAge();
   updateStabilityBar(nations);
 
@@ -230,51 +270,93 @@ export function renderNations(nations) {
 // ─────────────────────────────────────────────────────────────────
 export function selectNation(name, nations) {
   selectedNationName = name;
-  const n = nations[name];
-  const color = NATION_COLORS[name] || "#7a8099";
-  const crest = NATION_CRESTS[name] || "✦";
-  const power = computePower(n);
+  const n      = nations[name];
+  const color  = NATION_COLORS[name] || "#7a8099";
+  const crest  = NATION_CRESTS[name] || "✦";
+  const power  = computePower(n);
+  const threat = getThreatLevel(n.army);
 
   const statRowsHTML = STAT_DEFS.map((s) => {
     const pct = Math.min(100, (n[s.key] / s.max) * 100).toFixed(1);
     return `
       <div class="intel-stat-row">
-        <span class="intel-stat-label">${s.label}</span>
+        <span class="intel-stat-label" style="color:${s.color};">${s.sym} ${s.label}</span>
         <div class="intel-stat-track">
-          <div class="intel-stat-fill" style="width:0%;background:${s.color};"
+          <div class="intel-stat-fill" style="width:0%;background:linear-gradient(90deg,${s.color}aa,${s.color});"
                id="intel-bar-${esc(name)}-${s.key}"></div>
         </div>
         <span class="intel-stat-val">${statDisplay(s.key, n[s.key])}</span>
       </div>`;
   }).join("");
 
+  // Top memory quote
+  const memories = n.memory || [];
+  const lastMem  = memories.slice(-1)[0] || "";
+  const memHTML  = lastMem
+    ? `<div style="
+        margin-top:10px;padding:8px 10px;
+        background:rgba(212,175,55,0.04);
+        border-left:2px solid rgba(212,175,55,0.25);
+        border-radius:0 4px 4px 0;">
+        <span style="
+          font-family:'Cormorant Garamond',serif;
+          font-style:italic;font-size:11px;
+          color:var(--text-faint);line-height:1.5;">
+          "${esc(lastMem.slice(0, 80))}${lastMem.length > 80 ? "…" : ""}"
+        </span>
+       </div>`
+    : "";
+
   const panel = document.getElementById("selected-nation-display");
   panel.innerHTML = `
     <div class="intel-header">
-      <div class="intel-crest" style="color:${color};border-color:${color}50;
-           background:${color}12;">${crest}</div>
+      <div class="intel-crest" style="
+        color:${color};
+        border-color:${color}55;
+        background:radial-gradient(circle at 30% 30%, ${color}20, ${color}08);
+        box-shadow:0 0 16px ${color}30;
+      ">${crest}</div>
+
       <div class="intel-title">
         <div class="intel-name" style="color:${color};">${esc(name)}</div>
-        <div class="intel-ideo">${esc(n.ideology)}</div>
+        <div class="intel-ideo">${esc(n.ideology || "—")}</div>
       </div>
+
       <div class="intel-power-score">
-        <span style="font-size:7px;color:var(--text-faint);letter-spacing:.1em;">POWER</span>
-        <span class="intel-power-num" style="color:${color};">${power}</span>
+        <span style="font-size:6.5px;color:var(--text-faint);letter-spacing:.1em;display:block;">POWER</span>
+        <span class="intel-power-num" style="color:${color};text-shadow:0 0 12px ${color}70;">${power}</span>
+        <span style="
+          display:block;font-size:7px;font-weight:800;
+          color:${threat.color};letter-spacing:.1em;
+          margin-top:2px;text-shadow:0 0 8px ${threat.color};">
+          ${threat.label}
+        </span>
       </div>
     </div>
+
     ${statRowsHTML}
-    ${n.eliminated ? `<div style="font-family:'Cinzel',serif;color:#e74c3c;font-size:10px;
-       letter-spacing:.12em;text-align:center;margin-top:6px;">☠ NATION ELIMINATED</div>` : ""}
+    ${memHTML}
+
+    ${n.eliminated
+      ? `<div style="
+           font-family:'Cinzel',serif;color:#e74c3c;font-size:10px;
+           letter-spacing:.14em;text-align:center;margin-top:10px;
+           text-shadow:0 0 14px rgba(231,76,60,0.5);">
+           ☠ NATION ELIMINATED
+         </div>`
+      : ""}
   `;
 
-  // Animate bars in after a frame
+  // Staggered bar animations
   requestAnimationFrame(() => {
-    STAT_DEFS.forEach((s) => {
+    STAT_DEFS.forEach((s, i) => {
       const bar = document.getElementById(`intel-bar-${name}-${s.key}`);
       if (bar) {
         const pct = Math.min(100, (n[s.key] / s.max) * 100).toFixed(1);
-        bar.style.transition = "width 700ms cubic-bezier(0.4,0,0.2,1)";
-        bar.style.width = `${pct}%`;
+        setTimeout(() => {
+          bar.style.transition = "width 650ms cubic-bezier(0.4,0,0.2,1)";
+          bar.style.width = `${pct}%`;
+        }, i * 60);
       }
     });
   });
@@ -288,6 +370,15 @@ export function selectNation(name, nations) {
   document.querySelectorAll(".territory-path").forEach((p) => p.classList.remove("is-selected"));
   const territory = document.getElementById(`territory-${name}`);
   if (territory) territory.classList.add("is-selected");
+
+  // GSAP reveal if available
+  if (window.gsap) {
+    gsap.fromTo(
+      "#selected-nation-display",
+      { x: -8, opacity: 0.5 },
+      { x: 0,  opacity: 1,   duration: 0.35, ease: "power2.out" }
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -311,7 +402,7 @@ export function updateWorldMap(nations) {
 // UPDATE WORLD AGE
 // ─────────────────────────────────────────────────────────────────
 function updateWorldAge() {
-  const tc = document.getElementById("turn-counter");
+  const tc    = document.getElementById("turn-counter");
   const ageEl = document.getElementById("world-age-label");
   if (!tc || !ageEl) return;
   const turn = parseInt(tc.textContent.replace(/\D/g, "")) || 0;
@@ -339,10 +430,10 @@ function updateStabilityBar(nations) {
   if (!bar) return;
   const alive = Object.values(nations).filter((n) => !n.eliminated);
   if (!alive.length) { bar.style.width = "0%"; return; }
-  const avgHappy = alive.reduce((s, n) => s + (n.happiness || 0), 0) / alive.length;
-  const aliveRatio = alive.length / Object.keys(nations).length;
-  const stability = Math.round((avgHappy * 0.6 + aliveRatio * 0.4) * 100);
-  bar.style.width = `${stability}%`;
+  const avgHappy    = alive.reduce((s, n) => s + (n.happiness || 0), 0) / alive.length;
+  const aliveRatio  = alive.length / Object.keys(nations).length;
+  const stability   = Math.round((avgHappy * 0.6 + aliveRatio * 0.4) * 100);
+  bar.style.width   = `${stability}%`;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -350,7 +441,8 @@ function updateStabilityBar(nations) {
 // ─────────────────────────────────────────────────────────────────
 function buildEventEntry(event) {
   const isPlayerEvent = event.actor === "EVENT";
-  const style = ACTION_STYLES[event.action_type] || ACTION_STYLES.nothing;
+  const style      = ACTION_STYLES[event.action_type]  || ACTION_STYLES.nothing;
+  const icon       = ACTION_ICONS[event.action_type]   || "•";
   const actorColor = isPlayerEvent
     ? "var(--gold-bright)"
     : (NATION_COLORS[event.actor] || "var(--text-primary)");
@@ -369,6 +461,7 @@ function buildEventEntry(event) {
   entry.innerHTML = `
     <div class="event-entry-header">
       <span class="rarity-gem ${rarity}"></span>
+      <span style="font-size:11px;line-height:1;">${icon}</span>
       <span class="turn-pill">T${esc(event.turn)}</span>
       <span class="event-actor-name" style="color:${actorColor};">
         ${isPlayerEvent ? "⚡ EVENT" : esc(event.actor)}
@@ -377,7 +470,7 @@ function buildEventEntry(event) {
         ${esc(event.action_type)}
       </span>
     </div>
-    <p class="event-description" style="color:${isPlayerEvent ? "var(--gold-bright)" : "var(--text-primary)"};margin-top:3px;">
+    <p class="event-description" style="color:${isPlayerEvent ? "var(--gold-bright)" : "var(--text-primary)"};">
       ${esc(event.description)}
     </p>
     ${intelBlock}
@@ -390,14 +483,12 @@ function buildEventEntry(event) {
     });
   }
 
-  // Update chronicle count
   updateChronicleCount();
-
   return entry;
 }
 
 function updateChronicleCount() {
-  const el = document.getElementById("chronicle-count");
+  const el    = document.getElementById("chronicle-count");
   if (!el) return;
   const count = document.getElementById("event-log")?.children.length || 0;
   el.textContent = count > 0 ? `${count} records` : "";
@@ -416,9 +507,11 @@ export function renderEventLog(events) {
   log.innerHTML = "";
   if (!events || events.length === 0) {
     log.innerHTML = `<p id="event-log-empty" style="
-      font-family:'Cinzel',serif;font-style:italic;font-size:11px;
-      color:#3d4a5c;text-align:center;padding:28px 16px;
-      line-height:1.6;letter-spacing:.04em;">
+      font-family:'Cormorant Garamond',serif;
+      font-style:italic;font-size:12px;
+      color:#3d4a5c;text-align:center;
+      padding:32px 20px;line-height:1.8;
+      letter-spacing:.04em;">
       The world is quiet.<br>Advance a turn to begin history.
     </p>`;
     return;
@@ -429,7 +522,7 @@ export function renderEventLog(events) {
 
 export function prependEvent(event) {
   clearEmptyNotice();
-  const log = document.getElementById("event-log");
+  const log   = document.getElementById("event-log");
   const entry = buildEventEntry(event);
   entry.classList.add("slide-in-top");
   log.prepend(entry);
@@ -443,35 +536,35 @@ export function flashNation(nationName, type) {
   card.classList.remove("stat-flash-hit", "stat-flash-bonus");
   void card.offsetWidth;
   card.classList.add(cls);
-  setTimeout(() => card.classList.remove(cls), 600);
+  setTimeout(() => card.classList.remove(cls), 660);
 
   // Also flash territory on map
   const territory = document.getElementById(`territory-${nationName}`);
   if (territory) {
-    const origOpacity = territory.style.fillOpacity;
     territory.style.transition = "filter 150ms ease";
     territory.style.filter =
       type === "bonus"
-        ? "brightness(2) drop-shadow(0 0 14px rgba(212,175,55,0.9))"
-        : "brightness(1.8) saturate(2) drop-shadow(0 0 14px rgba(192,57,43,0.9))";
+        ? "brightness(2) drop-shadow(0 0 18px rgba(212,175,55,0.95))"
+        : "brightness(1.9) saturate(2) drop-shadow(0 0 18px rgba(192,57,43,0.95))";
     setTimeout(() => {
       territory.style.filter = "";
-    }, 600);
+    }, 660);
   }
 }
 
 export function animateStatChange(nationName, stat, newValue) {
   const el = document.getElementById(`stat-${nationName}-${stat}`);
   if (!el) return;
-  const isPct = stat === "happiness";
-  const current = isPct
+  const isPct     = stat === "happiness";
+  const isPop     = stat === "population";
+  const current   = isPct
     ? parseFloat(el.textContent) / 100
-    : parseFloat(el.textContent) || 0;
-  const start = performance.now();
-  const duration = 450;
+    : parseFloat(el.textContent.replace(/,/g, "")) || 0;
+  const start     = performance.now();
+  const duration  = 480;
 
   function frame(now) {
-    const t = Math.min(1, (now - start) / duration);
+    const t     = Math.min(1, (now - start) / duration);
     const eased = 1 - Math.pow(1 - t, 3);
     const value = current + (newValue - current) * eased;
     el.textContent = statDisplay(stat, value);
@@ -485,13 +578,12 @@ function animateStatBar(nationName, stat, newValue, max) {
   const bar = document.getElementById(`bar-${nationName}-${stat}`);
   if (!bar) return;
   const pct = Math.min(100, (newValue / max) * 100).toFixed(1);
-  // Allow CSS transition to handle the animation
   bar.style.width = `${pct}%`;
 }
 
 export function setStatus(status) {
   const pill = document.getElementById("status-pill");
-  const btn = document.getElementById("next-turn-btn");
+  const btn  = document.getElementById("next-turn-btn");
   pill.classList.remove("status-idle", "status-processing", "pulse-amber");
   if (status === "PROCESSING") {
     pill.textContent = "PROCESSING…";
@@ -505,9 +597,9 @@ export function setStatus(status) {
 }
 
 export function setTurn(turn) {
-  document.getElementById("turn-counter").textContent = `TURN ${turn}`;
+  const counter = document.getElementById("turn-counter");
+  counter.textContent = `TURN ${turn}`;
   updateWorldAge();
-  // Sync button label: PLAY on first turn, NEXT TURN after that
   const label = document.getElementById("next-turn-label");
   if (label && !label.classList.contains("pulse-amber")) {
     label.textContent = turn === 0 ? "PLAY" : "NEXT TURN";
@@ -519,21 +611,26 @@ export function showToast(message, type = "info") {
   toast.className = `toast toast-${type}`;
   toast.textContent = message;
   document.getElementById("toast-root").appendChild(toast);
-  setTimeout(() => toast.remove(), 60000);
+  // Auto-remove after 5 seconds for cleanliness
+  setTimeout(() => {
+    toast.style.transition = "opacity 300ms ease";
+    toast.style.opacity    = "0";
+    setTimeout(() => toast.remove(), 300);
+  }, 5000);
 }
 
 export function showModal(config) {
   hideModal();
-  const root = document.getElementById("modal-root");
+  const root    = document.getElementById("modal-root");
   const overlay = document.createElement("div");
   overlay.className = "modal-overlay";
 
   const footer = config.onConfirm
-    ? `<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:18px;">
+    ? `<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px;">
          <button class="modal-cancel-btn" data-modal-cancel>Cancel</button>
          <button class="modal-confirm-btn" data-modal-confirm>Confirm</button>
        </div>`
-    : `<div style="display:flex;justify-content:flex-end;margin-top:18px;">
+    : `<div style="display:flex;justify-content:flex-end;margin-top:20px;">
          <button class="modal-cancel-btn" data-modal-cancel>Close</button>
        </div>`;
 
@@ -591,103 +688,115 @@ export function showVictory(winner, victoryType) {
 
   Object.assign(banner.style, {
     position: "fixed", inset: "0", zIndex: "500",
-    background: "rgba(4,8,15,0.92)",
-    backdropFilter: "blur(10px)",
+    background: "rgba(3,5,10,0.94)",
+    backdropFilter: "blur(12px)",
     display: "flex", alignItems: "center", justifyContent: "center",
-    animation: "modalFadeIn 500ms ease-out",
+    animation: "modalFadeIn 600ms ease-out",
   });
 
   banner.innerHTML = `
     <div id="victory-box" style="
       position:relative;
-      background:linear-gradient(160deg,#141926 0%,#0b0f19 60%,#0e1420 100%);
-      border:1px solid ${color};border-radius:10px;
-      padding:52px 60px 44px;text-align:center;
-      max-width:540px;width:90vw;overflow:hidden;
+      background:linear-gradient(160deg,#141926 0%,#0b0f1a 60%,#0d1220 100%);
+      border:1px solid ${color};
+      border-radius:12px;
+      padding:54px 64px 48px;
+      text-align:center;
+      max-width:560px;width:90vw;overflow:hidden;
       box-shadow:
-        0 0 0 1px ${color}28,
-        0 0 50px ${color}35,
-        0 0 100px ${color}12,
-        0 50px 120px rgba(0,0,0,0.95);
-      animation:modalIn 700ms cubic-bezier(0.34,1.56,0.64,1);">
+        0 0 0 1px ${color}20,
+        0 0 60px ${color}40,
+        0 0 120px ${color}15,
+        0 60px 140px rgba(0,0,0,0.98);
+      animation:modalIn 750ms cubic-bezier(0.34,1.56,0.64,1);">
 
       <!-- Top glow bar -->
       <div style="position:absolute;top:0;left:0;right:0;height:2px;
-        background:linear-gradient(90deg,transparent 0%,${color} 30%,${color} 70%,transparent 100%);
-        box-shadow:0 0 12px ${color}80;"></div>
+        background:linear-gradient(90deg,transparent 0%,${color}80 20%,${color} 50%,${color}80 80%,transparent 100%);
+        box-shadow:0 0 16px ${color};"></div>
 
       <!-- Bottom accent -->
       <div style="position:absolute;bottom:0;left:0;right:0;height:1px;
-        background:linear-gradient(90deg,transparent 0%,${color}50 50%,transparent 100%);"></div>
+        background:linear-gradient(90deg,transparent 0%,${color}40 50%,transparent 100%);"></div>
 
       <!-- Corner ornaments -->
-      <div style="position:absolute;top:12px;left:12px;width:22px;height:22px;
-        border-top:2px solid ${color};border-left:2px solid ${color};opacity:0.65;"></div>
-      <div style="position:absolute;top:12px;right:12px;width:22px;height:22px;
-        border-top:2px solid ${color};border-right:2px solid ${color};opacity:0.65;"></div>
-      <div style="position:absolute;bottom:12px;left:12px;width:22px;height:22px;
-        border-bottom:2px solid ${color};border-left:2px solid ${color};opacity:0.65;"></div>
-      <div style="position:absolute;bottom:12px;right:12px;width:22px;height:22px;
-        border-bottom:2px solid ${color};border-right:2px solid ${color};opacity:0.65;"></div>
+      <div style="position:absolute;top:14px;left:14px;width:24px;height:24px;
+        border-top:2px solid ${color};border-left:2px solid ${color};opacity:0.7;"></div>
+      <div style="position:absolute;top:14px;right:14px;width:24px;height:24px;
+        border-top:2px solid ${color};border-right:2px solid ${color};opacity:0.7;"></div>
+      <div style="position:absolute;bottom:14px;left:14px;width:24px;height:24px;
+        border-bottom:2px solid ${color};border-left:2px solid ${color};opacity:0.7;"></div>
+      <div style="position:absolute;bottom:14px;right:14px;width:24px;height:24px;
+        border-bottom:2px solid ${color};border-right:2px solid ${color};opacity:0.7;"></div>
 
       <!-- Inner border -->
-      <div style="position:absolute;inset:8px;border:1px solid ${color}18;
-        border-radius:6px;pointer-events:none;"></div>
+      <div style="position:absolute;inset:10px;border:1px solid ${color}14;border-radius:8px;pointer-events:none;"></div>
 
       <!-- Nation crest -->
-      <div style="font-size:64px;line-height:1;margin-bottom:18px;color:${color};
-        filter:drop-shadow(0 0 18px ${color}90) drop-shadow(0 0 40px ${color}40);
-        animation:crestPulse 2s ease-in-out infinite;display:block;">${crest}</div>
+      <div style="
+        font-size:72px;line-height:1;margin-bottom:20px;color:${color};
+        animation:crestPulseLarge 2.2s ease-in-out infinite;display:block;">
+        ${crest}
+      </div>
 
       <!-- Victory type chip -->
-      <div style="display:inline-flex;align-items:center;gap:7px;
-        font-family:'Cinzel',serif;font-size:9px;font-weight:700;
-        letter-spacing:0.28em;text-transform:uppercase;
-        color:${color};border:1px solid ${color}55;border-radius:4px;
-        padding:4px 16px;margin-bottom:20px;background:${color}0d;">
+      <div style="
+        display:inline-flex;align-items:center;gap:8px;
+        font-family:'Cinzel',serif;font-size:8.5px;font-weight:800;
+        letter-spacing:0.3em;text-transform:uppercase;
+        color:${color};border:1px solid ${color}60;border-radius:5px;
+        padding:5px 18px;margin-bottom:22px;background:${color}0c;">
         ${vIcon} &nbsp;${esc(vLabel)} VICTORY
       </div>
 
       <!-- Winner name -->
-      <h3 style="font-family:'Cinzel',serif;font-weight:900;font-size:34px;
-        letter-spacing:0.14em;color:${color};
-        text-shadow:0 0 24px ${color}90,0 0 60px ${color}35,0 2px 4px rgba(0,0,0,0.8);
-        line-height:1.1;margin-bottom:8px;">${esc(winner)}</h3>
+      <h3 style="
+        font-family:'Cinzel',serif;font-weight:900;font-size:38px;
+        letter-spacing:0.15em;color:${color};
+        text-shadow:0 0 28px ${color}99,0 0 70px ${color}40,0 2px 6px rgba(0,0,0,0.9);
+        line-height:1.1;margin-bottom:10px;">
+        ${esc(winner)}
+      </h3>
 
       <!-- Proclamation -->
-      <div style="font-family:'Cinzel',serif;font-size:10px;letter-spacing:0.22em;
-        text-transform:uppercase;color:var(--gold-dim);margin-bottom:4px;">
+      <div style="
+        font-family:'Cinzel',serif;font-size:9.5px;letter-spacing:0.24em;
+        text-transform:uppercase;color:var(--gold-dim);margin-bottom:6px;">
         Has Conquered the Known World
       </div>
 
       <!-- Separator -->
-      <div style="height:1px;margin:22px 48px;
+      <div style="height:1px;margin:24px 52px;
         background:linear-gradient(90deg,transparent,${color}70,transparent);"></div>
 
-      <!-- Flavour -->
-      <p style="font-family:'Inter',sans-serif;font-size:12.5px;color:var(--text-muted);
-        line-height:1.65;margin-bottom:28px;font-style:italic;">
+      <!-- Flavour text -->
+      <p style="
+        font-family:'Cormorant Garamond',serif;font-size:14px;
+        color:var(--text-muted);line-height:1.7;margin-bottom:30px;font-style:italic;">
         The chronicles shall remember this age forever.<br>
         Reset the world to forge a new destiny.
       </p>
 
       <!-- Action buttons -->
-      <div style="display:flex;gap:10px;justify-content:center;align-items:center;">
+      <div style="display:flex;gap:12px;justify-content:center;align-items:center;">
         <button id="victory-reset-btn" style="
-          font-family:'Cinzel',serif;font-weight:800;font-size:10px;
-          letter-spacing:0.14em;text-transform:uppercase;color:#080a0c;
-          background:linear-gradient(135deg,#F4D03F,#D4AF37);
-          border:none;border-radius:6px;padding:11px 24px;cursor:pointer;
-          box-shadow:0 2px 14px ${color}50;
-          transition:transform 150ms,box-shadow 150ms;">♛ Begin New World</button>
-
+          font-family:'Cinzel',serif;font-weight:900;font-size:10px;
+          letter-spacing:0.15em;text-transform:uppercase;color:#060809;
+          background:linear-gradient(135deg,#FFE566,#F4D03F,#D4AF37);
+          border:none;border-radius:7px;padding:13px 26px;cursor:pointer;
+          box-shadow:0 2px 18px ${color}55;
+          transition:transform 160ms cubic-bezier(0.34,1.56,0.64,1),box-shadow 160ms;">
+          ♛ Begin New World
+        </button>
         <button id="victory-dismiss-btn" style="
-          font-family:'Cinzel',serif;font-weight:600;font-size:9px;
+          font-family:'Cinzel',serif;font-weight:700;font-size:9px;
           letter-spacing:0.1em;text-transform:uppercase;
           color:var(--text-muted);background:transparent;
-          border:1px solid rgba(42,51,71,0.8);border-radius:6px;
-          padding:11px 18px;cursor:pointer;
-          transition:color 150ms,border-color 150ms;">View Final World</button>
+          border:1px solid rgba(36,48,68,0.9);border-radius:7px;
+          padding:13px 20px;cursor:pointer;
+          transition:color 160ms,border-color 160ms;">
+          View Final World
+        </button>
       </div>
     </div>
   `;
@@ -698,12 +807,12 @@ export function showVictory(winner, victoryType) {
   const dismissBtn = document.getElementById("victory-dismiss-btn");
 
   resetBtn?.addEventListener("mouseenter", () => {
-    resetBtn.style.transform = "translateY(-2px)";
-    resetBtn.style.boxShadow = `0 4px 20px ${color}70`;
+    resetBtn.style.transform = "translateY(-3px) scale(1.02)";
+    resetBtn.style.boxShadow = `0 6px 26px ${color}75`;
   });
   resetBtn?.addEventListener("mouseleave", () => {
     resetBtn.style.transform = "";
-    resetBtn.style.boxShadow = `0 2px 14px ${color}50`;
+    resetBtn.style.boxShadow = `0 2px 18px ${color}55`;
   });
   resetBtn?.addEventListener("click", () => {
     banner.remove();
@@ -719,9 +828,17 @@ export function showVictory(winner, victoryType) {
     dismissBtn.style.borderColor = "";
   });
   dismissBtn?.addEventListener("click", () => {
-    banner.style.transition = "opacity 300ms ease";
+    banner.style.transition = "opacity 350ms ease";
     banner.style.opacity    = "0";
-    setTimeout(() => banner.remove(), 300);
+    setTimeout(() => banner.remove(), 350);
     // Button stays locked — game is over until reset
   });
+
+  // GSAP particle burst if available
+  if (window.gsap) {
+    gsap.fromTo("#victory-box",
+      { scale: 0.85, opacity: 0, y: 30 },
+      { scale: 1, opacity: 1, y: 0, duration: 0.8, ease: "back.out(1.5)", delay: 0.1 }
+    );
+  }
 }
