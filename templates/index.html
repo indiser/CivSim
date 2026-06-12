@@ -141,20 +141,28 @@
       <!-- ── CENTER: WORLD MAP ── -->
       <div id="world-map-container">
 
-        <!-- Decorative frame -->
+        <!-- World Map Container: Three.js canvas injects here as position:absolute child -->
+        <!-- SVG map kept in DOM (hidden) so existing territory-* ID queries don’t throw -->
         <div class="map-frame"></div>
         <div class="map-corner map-corner-tl"></div>
         <div class="map-corner map-corner-tr"></div>
         <div class="map-corner map-corner-bl"></div>
         <div class="map-corner map-corner-br"></div>
-        <div class="map-title-overlay">✦ &nbsp; KNOWN WORLD &nbsp; ✦</div>
 
-        <!-- Hover tooltip (populated by JS) -->
+        <!-- RTS camera controls hint (sits above the Three.js canvas via z-index) -->
+        <div id="cam-hint" style="
+          position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
+          z-index:10;pointer-events:none;
+          font-family:'Cinzel',serif;font-size:8px;letter-spacing:.14em;
+          color:rgba(212,175,55,0.35);white-space:nowrap;user-select:none;
+        ">DRAG · RIGHT-DRAG PAN · SCROLL ZOOM · CLICK KINGDOM</div>
+
+        <!-- Hover tooltip (populated by world3d.js raycasting) -->
         <div id="map-tooltip"></div>
 
-        <!-- SVG Fantasy Map -->
+        <!-- SVG Fantasy Map (HIDDEN — Three.js 3D world renders above this) -->
         <svg id="world-map-svg" viewBox="0 0 500 320" preserveAspectRatio="xMidYMid slice"
-             xmlns="http://www.w3.org/2000/svg">
+             xmlns="http://www.w3.org/2000/svg" style="display:none;">
           <defs>
             <!-- Ocean wave pattern -->
             <pattern id="ocean-wave" x="0" y="0" width="50" height="30" patternUnits="userSpaceOnUse">

@@ -6,6 +6,7 @@ import {
   setStatus, setTurn, showToast, showModal, hideModal,
   NATION_COLORS, selectNation, updateWorldMap, showVictory,
 } from "./renderer.js";
+import { initWorld } from "./world3d.js";
 
 const POLL_INTERVAL_MS = 30000;
 const BONUS_CARDS = new Set(["gold_rush", "miracle"]);
@@ -330,6 +331,7 @@ async function handleNextTurn() {
         action_type: actionType,
         description: a.public || "(no announcement)",
         secret:      a.secret || "",
+        target:      a.target || null,  // passed to world3d for animation
       });
     });
 
@@ -442,11 +444,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     showToast(`Error: ${e.message}`, "error");
   }
 
-  // 4. Map click handlers (after DOM + initial render)
-  initWorldMap();
-
-  // 5. Map hover tooltips
-  initMapTooltip();
+  // 4. 3D world (replaces SVG map click/hover handlers)
+  const mapContainer = document.getElementById("world-map-container");
+  if (mapContainer) {
+    initWorld(mapContainer, {
+      onSelect: (name) => {
+        if (latestNations[name] && !latestNations[name].eliminated) {
+          selectNation(name, latestNations);
+        }
+      },
+    });
+    // Tell world3d about initial nation state
+    if (window.civWorld && Object.keys(latestNations).length > 0) {
+      window.civWorld.updateNations(latestNations);
+    }
+  }
 
   // 6. Turn controls
   document.getElementById("next-turn-btn").addEventListener("click", handleNextTurn);

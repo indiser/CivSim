@@ -263,6 +263,9 @@ export function renderNations(nations) {
 
   // Update map territory states
   updateWorldMap(nations);
+
+  // ── 3D World hook ──
+  window.civWorld?.updateNations(nations);
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -527,6 +530,9 @@ export function prependEvent(event) {
   entry.classList.add("slide-in-top");
   log.prepend(entry);
   updateChronicleCount();
+
+  // ── 3D World hook ──
+  window.civWorld?.onEvent(event);
 }
 
 export function flashNation(nationName, type) {
@@ -550,6 +556,9 @@ export function flashNation(nationName, type) {
       territory.style.filter = "";
     }, 660);
   }
+
+  // ── 3D World hook ──
+  window.civWorld?.flashNation(nationName, type);
 }
 
 export function animateStatChange(nationName, stat, newValue) {
