@@ -1,0 +1,36 @@
+{# Jinja2 macro: Legendary Power Cards — six inject buttons styled as collectible strategy cards #}
+{% macro event_cards_panel() %}
+<div class="flex items-center gap-2 flex-wrap" id="event-card-panel">
+  <span class="inject-label">Inject Event:</span>
+
+  <button class="event-card" data-card="volcano" data-label="VOLCANO">
+    <span class="ev-icon">🌋</span>
+    <span>VOLCANO</span>
+  </button>
+
+  <button class="event-card" data-card="famine" data-label="FAMINE">
+    <span class="ev-icon">💀</span>
+    <span>FAMINE</span>
+  </button>
+
+  <button class="event-card" data-card="gold_rush" data-label="GOLD RUSH">
+    <span class="ev-icon">✨</span>
+    <span>GOLD RUSH</span>
+  </button>
+
+  <button class="event-card" data-card="plague" data-label="PLAGUE">
+    <span class="ev-icon">☣</span>
+    <span>PLAGUE</span>
+  </button>
+
+  <button class="event-card" data-card="coup" data-label="COUP">
+    <span class="ev-icon">⚡</span>
+    <span>COUP</span>
+  </button>
+
+  <button class="event-card" data-card="miracle" data-label="MIRACLE">
+    <span class="ev-icon">✝</span>
+    <span>MIRACLE</span>
+  </button>
+</div>
+{% endmacro %}

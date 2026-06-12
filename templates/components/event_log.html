@@ -1,0 +1,21 @@
+{# Jinja2 macro: World Chronicle — the scrollable event feed. Entries injected by renderer.js #}
+{% macro event_log_panel() %}
+<div class="chronicle-header">
+  <span class="chronicle-icon">📜</span>
+  <h2 class="chronicle-title">World Chronicle</h2>
+  <span class="chronicle-count" id="chronicle-count"></span>
+</div>
+<div id="event-log" class="flex-1 overflow-y-auto">
+  <p id="event-log-empty" style="
+    font-family: 'Cinzel', serif;
+    font-style: italic;
+    font-size: 11px;
+    color: #3d4a5c;
+    text-align: center;
+    padding: 28px 16px;
+    line-height: 1.6;
+    letter-spacing: 0.04em;">
+    The world is quiet.<br>Advance a turn to begin history.
+  </p>
+</div>
+{% endmacro %}

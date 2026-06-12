@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CivSim — Ancient Empire Simulator</title>
+  <meta name="description" content="Command civilizations across ages of war, trade, and diplomacy. A premium AI-driven strategy simulator.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <!-- Tailwind (keep for compatibility with any utility classes) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            cinzel: ['Cinzel', 'serif'],
+            inter:  ['Inter', 'sans-serif'],
+          },
+          colors: {
+            void:      '#0a0c10',
+            surface:   '#12161e',
+            raised:    '#1c2230',
+            stroke:    '#2a3347',
+            gold:      '#f0c040',
+            'gold-dim':'#7a611e',
+            war:       '#c0392b',
+            peace:     '#27ae60',
+            trade:     '#2980b9',
+            spy:       '#8e44ad',
+            parchment: '#e8e0cc',
+            muted:     '#7a8099',
+          }
+        }
+      }
+    }
+  </script>
+
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <link rel="stylesheet" href="/static/css/civsim.css">
+</head>
+<body>
+
+  {% from "components/nation_card.html"  import nation_skeleton %}
+  {% from "components/event_log.html"   import event_log_panel %}
+  {% from "components/event_cards.html" import event_cards_panel %}
+
+  <!-- ═══════════════════════════════════════════════════════════
+       AMBIENT PARTICLE CANVAS
+       ═══════════════════════════════════════════════════════════ -->
+  <canvas id="particle-canvas"></canvas>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       APP SHELL
+       ═══════════════════════════════════════════════════════════ -->
+  <div class="app-shell">
+
+    <!-- ─── TOP BANNER ───────────────────────────────────────── -->
+    <header id="empire-banner">
+
+      <!-- Logo -->
+      <div class="banner-logo">
+        <div class="logo-crest">♛</div>
+        <div>
+          <h1>CIVSIM</h1>
+          <div class="banner-logo-sub">Ancient Empire Simulator</div>
+        </div>
+      </div>
+
+      <!-- Centre stat strip -->
+      <div class="banner-stats">
+
+        <div class="banner-stat">
+          <span class="banner-stat-label">Turn</span>
+          <span id="turn-counter" class="banner-stat-value turn-glow">TURN 0</span>
+        </div>
+
+        <div class="banner-stat">
+          <span class="banner-stat-label">Nations Alive</span>
+          <span id="nations-alive-count" class="banner-stat-value">—</span>
+        </div>
+
+        <div class="banner-stat">
+          <span class="banner-stat-label">World Stability</span>
+          <div class="stability-track">
+            <div class="stability-fill" id="stability-bar" style="width:75%"></div>
+          </div>
+        </div>
+
+        <div class="banner-stat">
+          <span class="banner-stat-label">World Age</span>
+          <span id="world-age-label" class="banner-stat-value">Dawn</span>
+        </div>
+
+      </div>
+
+      <!-- Right pills -->
+      <div class="banner-right">
+        <span id="elim-pill" class="hidden"></span>
+        <span id="status-pill" class="status-pill status-idle">IDLE</span>
+      </div>
+
+    </header>
+
+    <!-- ─── MAIN WAR ROOM (three columns) ────────────────────── -->
+    <main id="war-room">
+
+      <!-- ── LEFT: EMPIRE INTELLIGENCE ── -->
+      <aside id="empire-intelligence" class="noise-panel">
+
+        <!-- Panel header -->
+        <div class="panel-header-bar">
+          <div class="panel-title">Empire Intelligence</div>
+        </div>
+
+        <!-- Selected nation detail -->
+        <div id="selected-nation-display">
+          <p class="select-prompt">⚔ Select a Kingdom</p>
+        </div>
+
+        <!-- Nation card list -->
+        <div class="kingdoms-list">
+          <div class="kingdoms-subheader">All Kingdoms</div>
+          <section id="nation-grid">
+            {% for i in range(5) %}{{ nation_skeleton() }}{% endfor %}
+          </section>
+        </div>
+
+      </aside>
+
+      <!-- ── CENTER: WORLD MAP ── -->
+      <div id="world-map-container">
+
+        <!-- Decorative frame -->
+        <div class="map-frame"></div>
+        <div class="map-corner map-corner-tl"></div>
+        <div class="map-corner map-corner-tr"></div>
+        <div class="map-corner map-corner-bl"></div>
+        <div class="map-corner map-corner-br"></div>
+        <div class="map-title-overlay">✦ &nbsp; KNOWN WORLD &nbsp; ✦</div>
+
+        <!-- SVG Fantasy Map -->
+        <svg id="world-map-svg" viewBox="0 0 500 320" preserveAspectRatio="xMidYMid slice"
+             xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <!-- Ocean wave pattern -->
+            <pattern id="ocean-wave" x="0" y="0" width="50" height="30" patternUnits="userSpaceOnUse">
+              <path d="M0,15 C8,10 17,20 25,15 C33,10 42,20 50,15"
+                    stroke="rgba(41,128,185,0.09)" stroke-width="1" fill="none"/>
+            </pattern>
+            <!-- Glow filter -->
+            <filter id="glow-sm">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+            <filter id="glow-lg">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+
+          <!-- ── Ocean background ── -->
+          <rect width="500" height="320" fill="#04101e"/>
+          <rect width="500" height="320" fill="url(#ocean-wave)" opacity="0.7"/>
+
+          <!-- Deep ocean gradient -->
+          <radialGradient id="seaGrad" cx="50%" cy="50%" r="60%">
+            <stop offset="0%" stop-color="#06182e" stop-opacity="0.6"/>
+            <stop offset="100%" stop-color="#020a14" stop-opacity="0.6"/>
+          </radialGradient>
+          <rect width="500" height="320" fill="url(#seaGrad)"/>
+
+          <!-- Sea label -->
+          <text x="250" y="170" font-family="Cormorant Garamond, serif"
+                font-style="italic" font-size="12" fill="rgba(41,128,185,0.22)"
+                text-anchor="middle" letter-spacing="6">INNER SEA</text>
+
+          <!-- Map grid lines (very subtle) -->
+          <g stroke="rgba(212,175,55,0.05)" stroke-width="0.5">
+            <line x1="0" y1="107" x2="500" y2="107"/>
+            <line x1="0" y1="214" x2="500" y2="214"/>
+            <line x1="167" y1="0" x2="167" y2="320"/>
+            <line x1="333" y1="0" x2="333" y2="320"/>
+          </g>
+
+          <!-- ══════════════════════════════════════════════════
+               TERRITORY PATHS  (IDs match NATION_COLORS keys)
+               ══════════════════════════════════════════════════ -->
+
+          <!-- IRONMARK — red, north-west -->
+          <path id="territory-Ironmark"
+                d="M 48,42 C 62,26 98,20 130,33 C 154,43 164,67 156,94
+                   C 147,120 122,132 93,126 C 64,120 42,101 40,75
+                   C 38,57 42,50 48,42 Z"
+                class="territory-path" data-nation="Ironmark" fill="#c0392b"/>
+
+          <!-- AURENTUM — amber, north-centre -->
+          <path id="territory-Aurentum"
+                d="M 187,27 C 202,14 240,10 265,25 C 287,37 293,65 282,91
+                   C 271,116 243,124 215,118 C 187,112 170,87 172,62
+                   C 174,44 181,34 187,27 Z"
+                class="territory-path" data-nation="Aurentum" fill="#f39c12"/>
+
+          <!-- SOLENNE — purple, north-east -->
+          <path id="territory-Solenne"
+                d="M 320,36 C 337,19 374,17 396,35 C 415,50 420,79 409,108
+                   C 397,134 369,144 342,136 C 315,128 299,103 301,74
+                   C 303,55 310,46 320,36 Z"
+                class="territory-path" data-nation="Solenne" fill="#8e44ad"/>
+
+          <!-- VALDRIS — blue, south-west -->
+          <path id="territory-Valdris"
+                d="M 57,170 C 76,153 126,149 162,167 C 190,181 200,213 187,248
+                   C 174,278 137,290 103,282 C 69,274 46,247 44,215
+                   C 42,193 47,181 57,170 Z"
+                class="territory-path" data-nation="Valdris" fill="#2980b9"/>
+
+          <!-- KETHARA — teal, south-east -->
+          <path id="territory-Kethara"
+                d="M 243,176 C 268,157 321,155 360,175 C 390,191 404,227 392,262
+                   C 380,293 343,304 306,296 C 269,288 241,261 237,229
+                   C 233,207 237,189 243,176 Z"
+                class="territory-path" data-nation="Kethara" fill="#16a085"/>
+
+          <!-- ── Animated pulse rings ── -->
+          <circle class="pulse-ring" id="pulse-Ironmark"  cx="100" cy="81"  r="10" fill="none" stroke="#c0392b" stroke-width="1.5" style="animation: svgPulse 2.6s ease-out infinite 0.0s;"/>
+          <circle class="pulse-ring" id="pulse-Aurentum"  cx="230" cy="68"  r="10" fill="none" stroke="#f39c12" stroke-width="1.5" style="animation: svgPulse 2.6s ease-out infinite 0.5s;"/>
+          <circle class="pulse-ring" id="pulse-Solenne"   cx="358" cy="88"  r="10" fill="none" stroke="#8e44ad" stroke-width="1.5" style="animation: svgPulse 2.6s ease-out infinite 1.0s;"/>
+          <circle class="pulse-ring" id="pulse-Valdris"   cx="116" cy="218" r="10" fill="none" stroke="#2980b9" stroke-width="1.5" style="animation: svgPulse 2.6s ease-out infinite 1.5s;"/>
+          <circle class="pulse-ring" id="pulse-Kethara"   cx="318" cy="228" r="10" fill="none" stroke="#16a085" stroke-width="1.5" style="animation: svgPulse 2.6s ease-out infinite 2.0s;"/>
+
+          <!-- ── Capital dots ── -->
+          <circle cx="100" cy="81"  r="3.5" fill="rgba(255,255,255,0.7)" filter="url(#glow-sm)"/>
+          <circle cx="230" cy="68"  r="3.5" fill="rgba(255,255,255,0.7)" filter="url(#glow-sm)"/>
+          <circle cx="358" cy="88"  r="3.5" fill="rgba(255,255,255,0.7)" filter="url(#glow-sm)"/>
+          <circle cx="116" cy="218" r="3.5" fill="rgba(255,255,255,0.7)" filter="url(#glow-sm)"/>
+          <circle cx="318" cy="228" r="3.5" fill="rgba(255,255,255,0.7)" filter="url(#glow-sm)"/>
+
+          <!-- ── Territory labels ── -->
+          <text x="100" y="99"  font-family="Cinzel,serif" font-size="8.5" font-weight="700"
+                fill="rgba(240,225,190,0.85)" text-anchor="middle" letter-spacing="1.5">IRONMARK</text>
+          <text x="230" y="86"  font-family="Cinzel,serif" font-size="8.5" font-weight="700"
+                fill="rgba(240,225,190,0.85)" text-anchor="middle" letter-spacing="1.5">AURENTUM</text>
+          <text x="358" y="106" font-family="Cinzel,serif" font-size="8.5" font-weight="700"
+                fill="rgba(240,225,190,0.85)" text-anchor="middle" letter-spacing="1.5">SOLENNE</text>
+          <text x="116" y="236" font-family="Cinzel,serif" font-size="8.5" font-weight="700"
+                fill="rgba(240,225,190,0.85)" text-anchor="middle" letter-spacing="1.5">VALDRIS</text>
+          <text x="318" y="246" font-family="Cinzel,serif" font-size="8.5" font-weight="700"
+                fill="rgba(240,225,190,0.85)" text-anchor="middle" letter-spacing="1.5">KETHARA</text>
+
+          <!-- ── Border dashes between territories ── -->
+          <line x1="164" y1="72" x2="174" y2="68" stroke="rgba(212,175,55,0.18)" stroke-width="1" stroke-dasharray="4,4"/>
+          <line x1="282" y1="70" x2="302" y2="74" stroke="rgba(212,175,55,0.18)" stroke-width="1" stroke-dasharray="4,4"/>
+
+          <!-- ── Compass rose ── -->
+          <g transform="translate(462,292)" opacity="0.7">
+            <circle r="13" fill="rgba(4,10,20,0.7)" stroke="rgba(212,175,55,0.35)" stroke-width="0.8"/>
+            <!-- N pointer (gold) -->
+            <polygon points="0,-10 2.2,-3.5 0,-5.5 -2.2,-3.5" fill="rgba(212,175,55,0.85)"/>
+            <!-- S pointer (dim) -->
+            <polygon points="0,10 2.2,3.5 0,5.5 -2.2,3.5" fill="rgba(150,130,80,0.45)"/>
+            <!-- E/W pointers -->
+            <polygon points="-10,0 -3.5,-2.2 -5.5,0 -3.5,2.2" fill="rgba(150,130,80,0.45)"/>
+            <polygon points="10,0 3.5,-2.2 5.5,0 3.5,2.2"  fill="rgba(150,130,80,0.45)"/>
+            <text y="-14" font-family="Cinzel,serif" font-size="5.5"
+                  fill="rgba(212,175,55,0.8)" text-anchor="middle" font-weight="700">N</text>
+          </g>
+        </svg>
+
+        <!-- Fog vignette -->
+        <div class="map-fog"></div>
+
+      </div><!-- /#world-map-container -->
+
+      <!-- ── RIGHT: WORLD CHRONICLE ── -->
+      <aside id="chronicle-panel" class="noise-panel">
+        {{ event_log_panel() }}
+      </aside>
+
+    </main><!-- /#war-room -->
+
+    <!-- ─── COMMAND BAR / FOOTER ─────────────────────────────── -->
+    <footer id="command-bar">
+
+      <div class="command-left">
+        <button id="next-turn-btn" class="turn-btn">
+          <i data-lucide="play" style="width:14px;height:14px;"></i>
+          <span id="next-turn-label">PLAY</span>
+        </button>
+        <button id="reset-btn" class="reset-btn">
+          <i data-lucide="rotate-ccw" style="width:11px;height:11px;"></i>
+          RESET
+        </button>
+      </div>
+
+      <div class="inject-divider"></div>
+
+      <div class="command-center">
+        {{ event_cards_panel() }}
+      </div>
+
+    </footer><!-- /#command-bar -->
+
+  </div><!-- /.app-shell -->
+
+  <!-- Modal + toast roots -->
+  <div id="modal-root"></div>
+  <div id="toast-root"></div>
+
+  <!-- SVG pulse keyframe (inline style needed for SVG animating transform-box) -->
+  <style>
+    @keyframes svgPulse {
+      0%   { r: 10; opacity: 0.85; }
+      80%  { r: 28; opacity: 0; }
+      100% { r: 10; opacity: 0; }
+    }
+  </style>
+
+  <script>document.addEventListener('DOMContentLoaded', () => lucide.createIcons());</script>
+  <script type="module" src="/static/js/main.js"></script>
+</body>
+</html>
